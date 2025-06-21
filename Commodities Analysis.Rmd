@@ -1,0 +1,149 @@
+---
+title: "Commodities Analysis"
+author: "Mariam Iftikhar"
+date: "2025-06-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# 📥 Load Libraries
+library(quantmod)
+library(TTR)
+```
+
+```{r}
+# 📊 Choose your commodity ETF
+symbol <- "PPLT"  # Change to "SLV", "GLD", "USO", etc.
+
+# 🕰 Get historical data
+getSymbols(symbol, from = "2022-01-01", auto.assign = TRUE)
+data <- get(symbol)
+
+# 📈 Technical Indicators
+price <- Cl(data)
+rsi <- RSI(price, n = 14)
+macd <- MACD(price, nFast = 12, nSlow = 26, nSig = 9)
+sma50 <- SMA(price, n = 50)
+sma200 <- SMA(price, n = 200)
+
+# 🧠 Entry/Exit Strategy Logic
+signals <- data.frame(Date = index(data),
+                      Price = as.numeric(price),
+                      RSI = as.numeric(rsi),
+                      MACD = as.numeric(macd$macd),
+                      Signal = as.numeric(macd$signal),
+                      SMA50 = as.numeric(sma50),
+                      SMA200 = as.numeric(sma200),
+                      stringsAsFactors = FALSE)
+summary(signals)
+
+
+# Re-initialize Position column
+signals$Position <- NA
+
+for (i in 2:nrow(signals)) {
+  if (!is.na(signals$RSI[i]) &&
+      !is.na(signals$SMA50[i]) &&
+      !is.na(signals$SMA200[i]) &&
+      !is.na(signals$MACD[i]) &&
+      !is.na(signals$Signal[i]) &&
+      !is.na(signals$MACD[i-1]) &&
+      !is.na(signals$Signal[i-1])) {
+    
+    if (signals$RSI[i] < 30 && signals$SMA50[i] > signals$SMA200[i]) {
+      signals$Position[i] <- "BUY"
+    } else if (signals$RSI[i] > 70 || 
+               (signals$MACD[i] < signals$Signal[i] && signals$MACD[i-1] > signals$Signal[i-1])) {
+      signals$Position[i] <- "SELL"
+    } else {
+      signals$Position[i] <- "HOLD"
+    }
+  } else {
+    signals$Position[i] <- NA
+  }
+}
+
+tail(signals[, c("Date", "Price", "RSI", "SMA50", "SMA200", "MACD", "Signal", "Position")])
+
+
+# 🖨️ View latest signal
+tail(signals, 10)
+
+# 📈 Optional: Plot with chart
+chartSeries(data, TA = c(addSMA(50), addSMA(200), addRSI(), addMACD()))
+```
+
+## Explanation of Code:
+
+1. quantmod is a popular package to get financial data and create charts.
+
+2. TTR provides technical indicators like RSI, MACD, and moving averages.
+
+3. symbol holds the ticker of the commodity ETF you want to analyze.
+
+4. getSymbols() downloads historical price data from Yahoo Finance starting from Jan 1, 2022.
+
+5. data stores the downloaded data (daily OHLCV prices).
+
+6. RSI: Measures momentum; values below 30 may indicate oversold (buy signal), above 70 overbought (sell signal).
+
+7. MACD: Measures trend and momentum; the difference between two EMAs (fast=12, slow=26) plus a signal line (9).
+
+8. SMA50 and SMA200: Trend indicators; 50-day SMA crossing above 200-day SMA usually indicates a bullish trend.
+
+9. Combines the date, price, and all indicators into one table (signals).
+
+10. Converts all data to numeric for easier calculations.
+
+11. This makes it easy to analyze day-by-day and generate trading signals.
+
+12. Creates a new column Position to store the trading decision for each day: "BUY", "SELL", or "HOLD".
+
+13. The loop iterates over each day from the second row onward.
+
+14. It only processes days where none of the required indicator values are NA (because early days may have missing SMA, MACD, or RSI).
+
+15. BUY signal:
+
+  a. RSI < 30 (oversold, likely price rebound)
+
+  b. 50-day SMA is above 200-day SMA (indicating a bullish trend)
+
+16. SELL signal:
+
+  a. RSI > 70 (overbought, possible price drop)
+
+  b. OR MACD line crosses below the signal line (bearish crossover)
+
+17. HOLD signal means no clear buy or sell conditions met.
+
+18. If insufficient data (NA in any indicators), position is set to NA.
+The loop iterates over each day from the second row onward.
+
+19. It only processes days where none of the required indicator values are NA (because early days may have missing SMA, MACD, or RSI).
+
+20. BUY signal:
+
+  a. RSI < 30 (oversold, likely price rebound)
+
+  b. 50-day SMA is above 200-day SMA (indicating a bullish trend)
+
+21. SELL signal:
+
+  a. RSI > 70 (overbought, possible price drop)
+
+  b. OR MACD line crosses below the signal line (bearish crossover)
+
+  c. HOLD signal means no clear buy or sell conditions met.
+
+  d. If insufficient data (NA in any indicators), position is set to NA.
+
+22. Uses quantmod's chartSeries to plot the ETF price chart.
+
+23. Adds 50-day and 200-day SMAs as lines on the price chart.
+
+24. Adds RSI and MACD plots below the price chart for momentum and trend visualization.
+
+25. This visual helps confirm signals and analyze trends.
